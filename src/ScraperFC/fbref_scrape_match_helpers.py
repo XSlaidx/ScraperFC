@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from io import StringIO
 import re
 import pandas as pd
-from .fbref_helpers import _get_ids_from_table
+from .fbref_helpers import _get_ids_from_table, _get_age_mask
 
 # ==================================================================================================
 def _get_date(soup: BeautifulSoup) -> str:
@@ -66,20 +66,22 @@ def _get_player_stats(soup: BeautifulSoup) -> dict[str, dict[str, pd.DataFrame]]
     home_player_stats = dict()
     for table in home_tables:
         key = table["id"].replace(f"stats_{home_id}", "").strip("_")
-        df = pd.read_html(StringIO(str(table)))[0]
+        df = pd.read_html(StringIO(str(table)))[0].copy()
         ids = _get_ids_from_table(table, "player")
-        not_nan_mask = ~df.xs("Age", level=1, axis=1).isna().to_numpy().squeeze()
-        df.loc[not_nan_mask, "Player ID"] = ids
+        not_nan_mask = _get_age_mask(df)
+        ids_aligned = pd.Series(ids, index=df.index[not_nan_mask][:len(ids)])
+        df.loc[ids_aligned.index, "Player ID"] = ids_aligned
         home_player_stats[key] = df
 
     away_tables = soup.find_all("table", {"id": re.compile(f"stats_{away_id}")})
     away_player_stats = dict()
     for table in away_tables:
         key = table["id"].replace(f"stats_{away_id}", "").strip("_")
-        df = pd.read_html(StringIO(str(table)))[0]
+        df = pd.read_html(StringIO(str(table)))[0].copy()
         ids = _get_ids_from_table(table, "player")
-        not_nan_mask = ~df.xs("Age", level=1, axis=1).isna().to_numpy().squeeze()
-        df.loc[not_nan_mask, "Player ID"] = ids
+        not_nan_mask = _get_age_mask(df)
+        ids_aligned = pd.Series(ids, index=df.index[not_nan_mask][:len(ids)])
+        df.loc[ids_aligned.index, "Player ID"] = ids_aligned
         away_player_stats[key] = df
 
     return {"home": home_player_stats, "away": away_player_stats}

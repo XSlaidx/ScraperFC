@@ -10,6 +10,12 @@ Australia A-League Women:
   FBREF:
     history url: https://fbref.com/en/comps/196/history/A-League-Women-Seasons
     finders: ['A-League-Women', 'W-League']
+Austria Bundesliga:
+  FBREF:
+    history url: https://fbref.com/en/comps/24/history/Austrian-Bundesliga-Seasons
+    finders: [Austrian-Bundesliga]
+  TRANSFERMARKT: https://www.transfermarkt.us/bundesliga/startseite/wettbewerb/A1
+  SOFASCORE: 45
 Belgium Pro League:
   CAPOLOGY: be/first-division-a
   FBREF:
@@ -163,6 +169,10 @@ Portugal Primeira Liga:
 Portugal Liga Portugal 2:
   SOFASCORE: 239
 Russia Premier League:
+  FBREF:
+    history url: https://fbref.com/en/comps/30/history/Russian-Premier-League-Seasons
+    finders: [Russian-Premier-League]
+  SOFASCORE: 203
   TRANSFERMARKT: https://www.transfermarkt.us/premier-liga/startseite/wettbewerb/RU1
   UNDERSTAT: https://understat.com/league/RFPL
 Saudi Arabia Pro League:

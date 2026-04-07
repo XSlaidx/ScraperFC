@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from io import StringIO
 import re
 import pandas as pd
-from .fbref_helpers import _get_ids_from_table, _get_age_mask
+from .fbref_helpers import _get_ids_from_table, _get_age_mask, _get_stats_table_tag, _get_all_stats_table_tags
 
 # ==================================================================================================
 def _get_date(soup: BeautifulSoup) -> str:
@@ -62,7 +62,7 @@ def _get_player_stats(soup: BeautifulSoup) -> dict[str, dict[str, pd.DataFrame]]
     """
     home_id, away_id = _get_team_ids(soup)
 
-    home_tables = soup.find_all("table", {"id": re.compile(f"stats_{home_id}")})
+    home_tables = _get_all_stats_table_tags(soup, {"name": "table", "id": re.compile(f"stats_{home_id}")})
     home_player_stats = dict()
     for table in home_tables:
         key = table["id"].replace(f"stats_{home_id}", "").strip("_")
@@ -73,7 +73,7 @@ def _get_player_stats(soup: BeautifulSoup) -> dict[str, dict[str, pd.DataFrame]]
         df.loc[ids_aligned.index, "Player ID"] = ids_aligned
         home_player_stats[key] = df
 
-    away_tables = soup.find_all("table", {"id": re.compile(f"stats_{away_id}")})
+    away_tables = _get_all_stats_table_tags(soup, {"name": "table", "id": re.compile(f"stats_{away_id}")})
     away_player_stats = dict()
     for table in away_tables:
         key = table["id"].replace(f"stats_{away_id}", "").strip("_")
@@ -91,13 +91,13 @@ def _get_shots(soup: BeautifulSoup) -> dict[str, pd.DataFrame]:
     """ Gets shot data
     """
     home_id, away_id = _get_team_ids(soup)
-    all_el = soup.find("table", {"id": "shots_all"})
+    all_el = _get_stats_table_tag(soup, {"name": "table", "id": "shots_all"})
     all_shots = pd.read_html(StringIO(str(all_el)))[0] if all_el else pd.DataFrame()
 
-    home_el = soup.find("table", {"id": re.compile(f"shots_{home_id}")})
+    home_el = _get_stats_table_tag(soup, {"name": "table", "id": re.compile(f"shots_{home_id}")})
     home_shots = pd.read_html(StringIO(str(home_el)))[0] if home_el else pd.DataFrame()
 
-    away_el = soup.find("table", {"id": re.compile(f"shots_{away_id}")})
+    away_el = _get_stats_table_tag(soup, {"name": "table", "id": re.compile(f"shots_{away_id}")})
     away_shots = pd.read_html(StringIO(str(away_el)))[0] if away_el else pd.DataFrame()
 
     return {"all": all_shots, "home": home_shots, "away": away_shots}

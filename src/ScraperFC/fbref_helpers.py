@@ -28,7 +28,8 @@ def _get_team_id_from_url(url: str) -> str:
 # ==================================================================================================
 def _find_commented_out_tables(soup: BeautifulSoup) -> list[str]:
     comments = soup.find_all(string = lambda el: isinstance(el, Comment))
-    table_comments = [c for c in comments if 'table' in c and '<div' in c]
+    # [v19.24] More relaxed filter to capture tactical tables
+    table_comments = [c for c in comments if '<table' in c.lower()]
     return table_comments
 
 # ==================================================================================================
@@ -75,13 +76,46 @@ def _get_stats_table_tag(soup: BeautifulSoup, soup_find_args: dict) -> Tag | Nav
     if table_tag is None:
         # Try to find commented out table
         table_comments = _find_commented_out_tables(soup)
+        # [v19.24] Correctly extract ID from attrs if present
+        target_id = soup_find_args.get("id") or soup_find_args.get("attrs", {}).get("id")
+        
         for comment in table_comments:
-            comment_soup = BeautifulSoup(comment, "html.parser")
+            # [v19.23] Fast ID check before expensive BS4 parsing
+            if target_id:
+                if isinstance(target_id, str) and target_id not in comment:
+                    continue
+                elif hasattr(target_id, "search") and not target_id.search(comment):
+                    continue
+
+            comment_soup = BeautifulSoup(str(comment), "html.parser")
             table_tag = comment_soup.find(**soup_find_args)
             if table_tag is not None:
                 return table_tag
 
     return table_tag
+
+
+# ==================================================================================================
+def _get_all_stats_table_tags(soup: BeautifulSoup, soup_find_args: dict) -> list[Tag]:
+    """ [v19.26] Find all stats tables in the soup (including comments). """
+    tags = list(soup.find_all(**soup_find_args))
+    
+    # Also look in comments
+    table_comments = _find_commented_out_tables(soup)
+    target_id = soup_find_args.get("id") or soup_find_args.get("attrs", {}).get("id")
+    
+    for comment in table_comments:
+        if target_id:
+            if isinstance(target_id, str) and target_id not in str(comment):
+                continue
+            elif hasattr(target_id, "search") and not target_id.search(str(comment)):
+                continue
+
+        comment_soup = BeautifulSoup(str(comment), "html.parser")
+        found_tags = comment_soup.find_all(**soup_find_args)
+        tags.extend(found_tags)
+        
+    return tags
 
 
 # ==================================================================================================

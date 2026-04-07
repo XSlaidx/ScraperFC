@@ -60,15 +60,19 @@ def _scrape_not_big5_stats(
         player_df = pd.read_html(StringIO(str(player_table_tag)))[0].copy()
 
         # Add player IDs
+        # [v19.31] Correct ID assignment for both flat and MultiIndex DataFrames
         player_ids = _get_ids_from_table(player_table_tag, "player")
         mask = player_df[('Unnamed: 0_level_0', 'Rk')] != 'Rk'
         target_indices = player_df.index[mask]
         
-        # [v19.29] Safety: match lengths to avoid "Must have equal len keys"
-        min_len = min(len(player_ids), len(target_indices))
-        if min_len > 0:
-            ids_aligned = pd.Series(player_ids[:min_len], index=target_indices[:min_len])
-            player_df.loc[ids_aligned.index, "Player ID"] = ids_aligned
+        player_df["Player ID"] = ""
+        for i, idx in enumerate(target_indices):
+            if i < len(player_ids):
+                player_df.at[idx, "Player ID"] = player_ids[i]
+        
+        # If it is MultiIndex, we should move the column into a tuple
+        if isinstance(player_df.columns, pd.MultiIndex):
+            player_df.rename(columns={"Player ID": ("", "Player ID")}, inplace=True)
     elif player_table_tag is None:
         print(f'\nWARNING: Player stats table from {stat_url} is None.')
         player_df = pd.DataFrame()

@@ -4,7 +4,10 @@ from io import StringIO
 import pandas as pd
 from bs4 import BeautifulSoup
 from tqdm import tqdm
-from botasaurus.browser import browser, ElementWithSelectorNotFoundException
+try:
+    from seleniumbase import Driver
+except ImportError:
+    Driver = None
 
 from .scraperfc_exceptions import InvalidLeagueException, InvalidYearException,\
     NoMatchLinksException
@@ -36,26 +39,45 @@ class FBref:
     def __init__(self, wait_time: int = 6) -> None:
         # FBref rate limits bots -- https://www.sports-reference.com/bot-traffic.html
         self.wait_time = wait_time
+        self.driver = None  # [v19.28] Persistence support
 
     # ==============================================================================================
-    @staticmethod
-    def _get_soup(url: str) -> BeautifulSoup:
-        """ Private, gets soup using botasaurus. """
-        @browser(
-            headless=False, block_images_and_css=False,
-            wait_for_complete_page_load=False,
-            output=None, create_error_logs=False,
-        )
-        def _(driver, url):  # type: ignore
-            driver.google_get(url)
-            while True:
-                try:
-                    driver.wait_for_element("body.fb", wait=10)
-                    break
-                except ElementWithSelectorNotFoundException:
-                    driver.reload()
-            return BeautifulSoup(driver.page_html, "html.parser")
-        return _(url)
+    def _get_soup(self, url: str) -> BeautifulSoup:
+        """ Private, gets soup using SeleniumBase (reusing self.driver if possible). (v19.30) """
+        if self.driver is None:
+            if Driver is None:
+                raise ImportError("seleniumbase is not installed. Please install it to use FBref bypass.")
+            self.driver = Driver(browser="chrome", uc=True, headless=True)
+
+        driver = self.driver
+        driver.get(url)
+        
+        # [v19.25] Handle Cloudflare
+        import time
+        for attempt in range(10):
+            title = driver.title
+            if "Just a moment" in title or "Cloudflare" in title:
+                time.sleep(5)
+            else:
+                break
+        
+        # Wait for the table or body
+        try:
+            driver.wait_for_element("body.fb", timeout=20)
+        except Exception:
+            driver.refresh()
+            time.sleep(5)
+            
+        return BeautifulSoup(driver.page_source, "html.parser")
+
+    def close(self):
+        """ [v19.30] Close the persistent driver. """
+        if self.driver:
+            try: 
+                self.driver.quit()
+            except: 
+                pass
+            self.driver = None
 
     # ==============================================================================================
     def get_valid_seasons(self, league: str) -> dict:

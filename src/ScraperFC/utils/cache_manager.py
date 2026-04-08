@@ -19,7 +19,7 @@ class CacheManager:
         }
         # Standardize data to ensure same hash for same inputs
         serialized = json.dumps(key_data, sort_keys=True, default=str)
-        return hashlib.mdsafe(serialized.encode()).hexdigest()
+        return hashlib.md5(serialized.encode()).hexdigest()
 
     def get(self, func_name: str, *args, **kwargs) -> Optional[Any]:
         """ Retrieves data from cache if exists. """

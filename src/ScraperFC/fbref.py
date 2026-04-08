@@ -40,6 +40,7 @@ class FBref:
         # FBref rate limits bots -- https://www.sports-reference.com/bot-traffic.html
         self.wait_time = wait_time
         self.driver = None  # [v19.28] Persistence support
+        self.headless = True # [v19.35] Start in headless mode
 
     # ==============================================================================================
     def _get_soup(self, url: str) -> BeautifulSoup:
@@ -47,24 +48,53 @@ class FBref:
         if self.driver is None:
             if Driver is None:
                 raise ImportError("seleniumbase is not installed. Please install it to use FBref bypass.")
-            self.driver = Driver(browser="chrome", uc=True, headless=True)
+            self.driver = Driver(browser="chrome", uc=True, headless=self.headless)
 
         driver = self.driver
-        driver.get(url)
         
+        # [v19.34] Driver Self-Healing: Try to get the URL, restart if session is lost
+        try:
+            driver.get(url)
+        except Exception as e:
+            if "10061" in str(e) or "target window already closed" in str(e).lower() or "not connected" in str(e).lower():
+                # logger.warning(f"      ⚠️ FBref Session lost ({e}). Restarting driver...")
+                self.close()
+                return self._get_soup(url) # Recursive retry with fresh driver
+            raise e
+
         # [v19.25] Handle Cloudflare
+        cf_detected = False
         import time
         for attempt in range(10):
-            title = driver.title
-            if "Just a moment" in title or "Cloudflare" in title:
-                time.sleep(5)
-            else:
-                break
+            try:
+                title = driver.title
+                if "Just a moment" in title or "Cloudflare" in title:
+                    cf_detected = True
+                    time.sleep(5)
+                else:
+                    cf_detected = False
+                    break
+            except Exception:
+                # If we can't even get the title, the session is likely dead
+                self.close()
+                return self._get_soup(url)
+        
+        # [v19.35] Fallback: If still Cloudflare and we are in headless, retry with visible browser
+        if cf_detected and self.headless:
+            print("      ⚠️ FBref: Cloudflare detected in headless mode. Retrying with visible browser...")
+            self.close()
+            self.headless = False
+            return self._get_soup(url)
         
         # Wait for the table or body
         try:
             driver.wait_for_element("body.fb", timeout=20)
         except Exception:
+            if self.headless:
+                print("      ⚠️ FBref: Element wait failed in headless mode. Retrying with visible browser...")
+                self.close()
+                self.headless = False
+                return self._get_soup(url)
             driver.refresh()
             time.sleep(5)
             

@@ -63,6 +63,9 @@ England WSL:
   FBREF:
     history url: https://fbref.com/en/comps/189/history/Womens-Super-League-Seasons
     finders: ['Womens-Super-League']
+  SOFASCORE: 1044
+England WSL 2:
+  SOFASCORE: 10553
 FBref Big 5 Combined:
   FBREF:
     history url: https://fbref.com/en/comps/Big5/history/Big-5-European-Leagues-Seasons
@@ -92,6 +95,9 @@ France Ligue 2:
     finders: ['Ligue-2']
   SOFASCORE: 182
   TRANSFERMARKT: https://www.transfermarkt.us/ligue-2/startseite/wettbewerb/FR2
+France National 1:
+  SOFASCORE: 183
+  TRANSFERMARKT: https://www.transfermarkt.us/national/startseite/wettbewerb/FR3
 France Premiere Ligue:
   FBREF:
     history url: https://fbref.com/en/comps/193/history/Division-1-Feminine-Seasons

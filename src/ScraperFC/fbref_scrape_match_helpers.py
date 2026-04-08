@@ -8,53 +8,104 @@ from .fbref_helpers import _get_ids_from_table, _get_age_mask, _get_stats_table_
 
 # ==================================================================================================
 def _get_date(soup: BeautifulSoup) -> str:
-    """ Gets match date
-    """
+    """ Gets match date """
+    # Method 1: Strong tag in scorebox_meta
     scorebox_meta_tag = soup.find("div", {"class": "scorebox_meta"})
-    if scorebox_meta_tag is not None:
-        date = scorebox_meta_tag.find("strong").text  # type: ignore
-    else:
-        date = soup.find("span", {"class": "venuetime"})["data-venue-date"]  # type: ignore
-    return date
+    if scorebox_meta_tag:
+        strong_tag = scorebox_meta_tag.find("strong")
+        if strong_tag:
+            return strong_tag.text.strip()
+        # Fallback: second div in scorebox_meta
+        divs = scorebox_meta_tag.find_all("div")
+        if len(divs) > 0:
+            return divs[0].text.strip()
+
+    # Method 2: venuetime span (old method, with fallback)
+    venue_time = soup.find("span", {"class": "venuetime"})
+    if venue_time:
+        if venue_time.has_attr("data-venue-date"):
+            return venue_time["data-venue-date"]
+        return venue_time.text.strip()
+
+    # Method 3: Title of the page
+    title = soup.find("title")
+    if title:
+        # Match Report - City vs Arsenal, March 31, 2024
+        match = re.search(r",\s*([A-Z][a-z]+ \d{1,2}, \d{4})", title.text)
+        if match:
+            return match.group(1)
+
+    return "Unknown Date"
 
 # ==================================================================================================
 def _get_stage(soup: BeautifulSoup) -> str:
-    """ Gets the stage description
-    """
-    stage = soup.find("div", {"role": "main"}).find("div").text  # type: ignore
-    return stage
+    """ Gets the stage description """
+    main_div = soup.find("div", {"role": "main"})
+    if not main_div:
+        return "Unknown Stage"
+    
+    first_div = main_div.find("div")
+    if first_div:
+        return first_div.text.strip()
+    return "Unknown Stage"
 
 # ==================================================================================================
 def _get_team_names(soup: BeautifulSoup) -> tuple[str, str]:
-    """ Gets home and away team names
-    """
-    team_els = soup.find("div", {"class": "scorebox"}).find_all("div", recursive=False)  # type: ignore
-    home_el, away_el = team_els[0], team_els[1]
-    home_name = home_el.find("div").text.strip()
-    away_name = away_el.find("div").text.strip()
+    """ Gets home and away team names """
+    scorebox = soup.find("div", {"class": "scorebox"})
+    if not scorebox:
+        return "Home", "Away"
+    
+    team_els = scorebox.find_all("div", recursive=False)
+    if len(team_els) < 2:
+        # Try finding team names via links
+        links = scorebox.find_all("a", {"itemprop": "name"})
+        if len(links) >= 2:
+            return links[0].text.strip(), links[1].text.strip()
+        return "Home", "Away"
+
+    home_name = team_els[0].find("div").text.strip()
+    away_name = team_els[1].find("div").text.strip()
     return home_name, away_name
 
 # ==================================================================================================
 def _get_team_ids(soup: BeautifulSoup) -> tuple[str, str]:
-    """ Gets home and away team IDs
-    """
-    team_els = soup.find("div", {"class": "scorebox"}).find_all("div", recursive=False)  # type: ignore
-    home_el, away_el = team_els[0], team_els[1]
-    home_id = home_el.find("div").find("strong").find("a")["href"].split("/")[3]
-    away_id = away_el.find("div").find("strong").find("a")["href"].split("/")[3]
+    """ Gets home and away team IDs """
+    scorebox = soup.find("div", {"class": "scorebox"})
+    if not scorebox:
+        return "unknown", "unknown"
+    
+    team_els = scorebox.find_all("div", recursive=False)
+    if len(team_els) < 2:
+        return "unknown", "unknown"
+    
+    def extract_id(el):
+        link = el.find("a", href=re.compile(r"/en/squads/"))
+        if link:
+            parts = link["href"].split("/")
+            if len(parts) >= 4:
+                return parts[3]
+        return "unknown"
+
+    home_id = extract_id(team_els[0])
+    away_id = extract_id(team_els[1])
     return home_id, away_id
 
 # ==================================================================================================
 def _get_goals(soup: BeautifulSoup) -> tuple[str, str]:
-    """ Gets home and away team goals
-
-    Don't cast to int because games that were awarded to one team have `*` by that team's goals
-    """
-    team_els = soup.find("div", {"class": "scorebox"}).find_all("div", recursive=False)  # type: ignore
-    home_el, away_el = team_els[0], team_els[1]
-    home_goals = home_el.find("div", {"class": "score"}).text
-    away_goals = away_el.find("div", {"class": "score"}).text
-    return home_goals, away_goals
+    """ Gets home and away team goals """
+    scorebox = soup.find("div", {"class": "scorebox"})
+    if not scorebox:
+        return "0", "0"
+    
+    team_els = scorebox.find_all("div", recursive=False)
+    if len(team_els) < 2:
+        return "0", "0"
+    
+    home_goals = team_els[0].find("div", {"class": "score"}).text if team_els[0].find("div", {"class": "score"}) else "0"
+    away_goals = team_els[1].find("div", {"class": "score"}).text if team_els[1].find("div", {"class": "score"}) else "0"
+    
+    return home_goals.strip(), away_goals.strip()
 
 # ==================================================================================================
 def _get_player_stats(soup: BeautifulSoup) -> dict[str, dict[str, pd.DataFrame]]:

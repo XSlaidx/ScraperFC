@@ -52,51 +52,53 @@ class FBref:
 
         driver = self.driver
         
-        # [v19.34] Driver Self-Healing: Try to get the URL, restart if session is lost
         try:
             driver.get(url)
         except Exception as e:
             if "10061" in str(e) or "target window already closed" in str(e).lower() or "not connected" in str(e).lower():
-                # logger.warning(f"      ⚠️ FBref Session lost ({e}). Restarting driver...")
                 self.close()
-                return self._get_soup(url) # Recursive retry with fresh driver
+                return self._get_soup(url)
             raise e
 
-        # [v19.25] Handle Cloudflare
+        # Handle Cloudflare
         cf_detected = False
         import time
-        for attempt in range(10):
+        for attempt in range(15): # Increased attempts
             try:
                 title = driver.title
-                if "Just a moment" in title or "Cloudflare" in title:
+                # Check for CF indicators
+                if "Just a moment" in title or "Cloudflare" in title or "Verify you are human" in title:
                     cf_detected = True
                     time.sleep(5)
                 else:
                     cf_detected = False
                     break
             except Exception:
-                # If we can't even get the title, the session is likely dead
                 self.close()
                 return self._get_soup(url)
         
-        # [v19.35] Fallback: If still Cloudflare and we are in headless, retry with visible browser
+        # Fallback: Retry with visible browser if CF persists
         if cf_detected and self.headless:
-            print("      ⚠️ FBref: Cloudflare detected in headless mode. Retrying with visible browser...")
+            print(f"      ⚠️ FBref: Cloudflare detected. Switching to visible mode for: {url}")
             self.close()
             self.headless = False
             return self._get_soup(url)
         
-        # Wait for the table or body
+        # Wait for the main content
         try:
-            driver.wait_for_element("body.fb", timeout=20)
+            # Look for any of the common FBref indicators
+            driver.wait_for_element("body.fb, div.scorebox, div#content", timeout=25)
         except Exception:
             if self.headless:
-                print("      ⚠️ FBref: Element wait failed in headless mode. Retrying with visible browser...")
+                print(f"      ⚠️ FBref: Content not found in headless mode. Retrying visible for: {url}")
                 self.close()
                 self.headless = False
                 return self._get_soup(url)
+            
+            # If already visible, try refreshing once
+            print(f"      ⚠️ FBref: Content wait timeout. Page title: {driver.title}")
             driver.refresh()
-            time.sleep(5)
+            time.sleep(10)
             
         return BeautifulSoup(driver.page_source, "html.parser")
 

@@ -119,10 +119,16 @@ class ScraperFC:
             item = {}
             for k, v in row.items():
                 if isinstance(v, dict):
-                    prefix = "" if k in ["statistics", "player", "team"] else f"{k}_"
-                    # If it's statistics, we can merge directly, otherwise prefix
+                    if k == "statistics":
+                        prefix = ""
+                    elif k in ["player", "team"]:
+                        prefix = f"{k}_"
+                    else:
+                        prefix = f"{k}_"
+                    
+                    # Merge dictionaries with prefix
                     for sub_k, sub_v in v.items():
-                        new_key = sub_k if k == "statistics" else f"{prefix}{sub_k}"
+                        new_key = sub_k if prefix == "" else f"{prefix}{sub_k}"
                         item[new_key] = sub_v
                 else:
                     item[k] = v
